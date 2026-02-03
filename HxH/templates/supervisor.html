@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% set title = "Panel Supervisor" %}
+{% set subtitle = "Vista global • Metas • Bitácora por técnico y línea" %}
+
+{% block content %}
+
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Filtros</h3>
+      <div class="muted small">
+        Fecha seleccionada: <b>{{ selected_date }}</b>
+        <span style="margin-left:10px;">
+          • Rango activo: <b>{{ schedule_start }} → {{ schedule_end }}</b>
+        </span>
+        <span style="margin-left:10px;">
+          • <b>Auto-refresh:</b> 120s (inteligente)
+        </span>
+      </div>
+    </div>
+
+    <div class="row" style="gap:10px;">
+      <a class="btnlink" href="{{ url_for('weekly_report') }}">
+        Ver Reporte Semanal (Lun–Vie)
+      </a>
+
+      <a class="btnlink" href="{{ url_for('export_excel', date=selected_date, emp=selected_emp, line=selected_line) }}">
+        Exportar Excel
+      </a>
+    </div>
+  </div>
+
+  <form method="GET" class="row" style="margin-top:12px;">
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" name="date" value="{{ selected_date }}">
+    </div>
+
+    <div class="field">
+      <label>Técnico</label>
+      <select name="emp">
+        <option value="">Todos</option>
+        {% for u in users_list %}
+          {% if u["role"] == "technician" %}
+            <option value="{{ u['employee_no'] }}" {% if selected_emp == u['employee_no'] %}selected{% endif %}>
+              {{ u["employee_no"] }} - {{ u["name"] }}
+            </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Línea</label>
+      <select name="line">
+        <option value="">Todas</option>
+        {% for l in lines %}
+          <option value="{{ l }}" {% if selected_line == l %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn" type="submit">Aplicar</button>
+    </div>
+  </form>
+</div>
+
+<!-- ======================================================
+     ✅ INVENTARIO POR LÍNEA (TIEMPO REAL)
+     ====================================================== -->
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Inventario por Línea (Tiempo Real)</h3>
+      <div class="muted small">
+        Fecha: <b>{{ selected_date }}</b>
+        <span style="margin-left:10px;">
+          • Producción considerada: <b>{{ schedule_start }} → {{ schedule_end }}</b>
+        </span>
+      </div>
+    </div>
+
+    <div class="muted small">
+      Última actualización: <b>{{ now().strftime("%H:%M:%S") }}</b>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:10px;">
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Línea</th>
+          <th>Inventario Inicial</th>
+          <th>Producido</th>
+          <th>Inventario Final</th>
+          <th>Técnicos sin Inicial</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if inv_lines|length == 0 %}
+          <tr><td colspan="6" class="muted">Sin datos de inventario.</td></tr>
+        {% endif %}
+
+        {% for row in inv_lines %}
+          <tr>
+            <td><b>{{ row.line }}</b></td>
+
+            <td>
+              {% if row.initial_sum is not none %}
+                <b>{{ row.initial_sum }}</b>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+
+            <td><b>{{ row.produced_sum }}</b></td>
+
+            <td>
+              {% if row.final_sum is not none %}
+                <b class="{% if row.final_sum < 0 %}dangertext{% endif %}">
+                  {{ row.final_sum }}
+                </b>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+
+            <td>
+              {% if row.missing_count > 0 %}
+                <span class="warntext"><b>{{ row.missing_count }}</b></span>
+              {% else %}
+                <span class="oktext">0</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <details>
+                <summary class="btnlink">Ver técnicos</summary>
+
+                <div class="tablewrap" style="margin-top:10px;">
+                  <table class="table compact">
+                    <thead>
+                      <tr>
+                        <th>Empleado</th>
+                        <th>Nombre</th>
+                        <th>Inicial</th>
+                        <th>Producido</th>
+                        <th>Final</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for t in inv_by_line[row.line] %}
+                        <tr>
+                          <td><b>{{ t.employee_no }}</b></td>
+                          <td>{{ t.name }}</td>
+
+                          <td>
+                            {% if t.initial is none %}
+                              <span class="warntext">-</span>
+                            {% else %}
+                              <b>{{ t.initial }}</b>
+                            {% endif %}
+                          </td>
+
+                          <td><b>{{ t.produced }}</b></td>
+
+                          <td>
+                            {% if t.final is none %}
+                              -
+                            {% else %}
+                              <b class="{% if t.final < 0 %}dangertext{% endif %}">
+                                {{ t.final }}
+                              </b>
+                            {% endif %}
+                          </td>
+
+                          <td>
+                            {% if t.initial is none %}
+                              <span class="warntext">Falta inicial</span>
+                            {% elif t.final < 0 %}
+                              <span class="dangertext">Negativo</span>
+                            {% else %}
+                              <span class="oktext">OK</span>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+              </details>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="muted small" style="margin-top:10px;">
+    Nota: El inventario final se calcula como <b>Inicial - Producido</b>. Si el final sale negativo, significa que el técnico produjo más de lo declarado como inicial.
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:14px;">
+  <div class="card">
+    <h3>Metas por Técnico</h3>
+
+    <form method="POST" class="row">
+      <input type="hidden" name="action" value="set_tech_goal">
+      <div class="field flex1">
+        <label>No. Empleado</label>
+        <input name="employee_no" placeholder="Ej: 12345" required>
+      </div>
+      <div class="field">
+        <label>Meta diaria</label>
+        <input name="daily_goal" type="number" min="0" placeholder="0" required>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+
+    <div class="tablewrap">
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Nombre</th>
+            <th>Línea</th>
+            <th>Total (GOOD+FIX)</th>
+            <th>Meta</th>
+            <th>Faltante</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if emp_progress|length == 0 %}
+            <tr><td colspan="6" class="muted">Sin datos.</td></tr>
+          {% endif %}
+          {% for r in emp_progress %}
+            <tr>
+              <td><b>{{ r.employee_no }}</b></td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.line }}</td>
+              <td><b>{{ r.total }}</b></td>
+              <td>{{ r.goal if r.goal is not none else "-" }}</td>
+              <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Metas por Línea</h3>
+
+    <form method="POST" class="row">
+      <input type="hidden" name="action" value="set_line_goal">
+      <div class="field flex1">
+        <label>Línea</label>
+        <select name="line" required>
+          {% for l in lines %}
+            <option value="{{ l }}">{{ l }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Meta diaria</label>
+        <input name="daily_goal" type="number" min="0" placeholder="0" required>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+
+    <div class="tablewrap">
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Línea</th>
+            <th>Total (GOOD+FIX)</th>
+            <th>Meta</th>
+            <th>Faltante</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if line_progress|length == 0 %}
+            <tr><td colspan="4" class="muted">Sin datos.</td></tr>
+          {% endif %}
+          {% for r in line_progress %}
+            <tr>
+              <td><b>{{ r.line }}</b></td>
+              <td><b>{{ r.total }}</b></td>
+              <td>{{ r.goal if r.goal is not none else "-" }}</td>
+              <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================
+     ✅ BITÁCORA DEL DÍA
+     ====================================================== -->
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Bitácora (Día Seleccionado)</h3>
+      <div class="muted small">
+        Fecha: <b>{{ selected_date }}</b>
+        <span style="margin-left:10px;">
+          • Horario: <b>{{ schedule_start }} → {{ schedule_end }}</b>
+        </span>
+      </div>
+    </div>
+
+    <div class="muted small">
+      Última actualización: <b>{{ now().strftime("%H:%M:%S") }}</b>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:10px;">
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Empleado</th>
+          <th>Nombre</th>
+          <th>Línea</th>
+          <th>Número de Parte</th>
+          <th>Tipo</th>
+          <th>Cantidad</th>
+          <th>Actualización</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if logs|length == 0 %}
+          <tr><td colspan="8" class="muted">Sin registros para estos filtros.</td></tr>
+        {% endif %}
+
+        {% for r in logs %}
+          {% set t = (r["log_type"] or "GOOD")|upper %}
+          <tr>
+            <td><b>{{ r["log_time"] }}</b></td>
+            <td>{{ r["employee_no"] }}</td>
+            <td>{{ r["name"] }}</td>
+            <td>{{ r["line"] }}</td>
+            <td>{{ r["part_no"] }}</td>
+
+            <td>
+              {% if t == "GOOD" %}
+                <span class="oktext"><b>GOOD</b></span>
+              {% elif t == "FIX" %}
+                <span class="warntext"><b>FIX</b></span>
+              {% else %}
+                <span class="dangertext"><b>SCRAP</b></span>
+              {% endif %}
+            </td>
+
+            <td><b>{{ r["qty"] }}</b></td>
+            <td class="muted small">{{ r["updated_at"] }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ✅ Auto-refresh inteligente (solo si NO estás escribiendo) -->
+<script>
+  const REFRESH_MS = 120000; // 120s = 2 min
+
+  function userIsTypingOrEditing() {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = (el.tagName || "").toLowerCase();
+    return tag === "input" || tag === "select" || tag === "textarea";
+  }
+
+  setInterval(() => {
+    if (userIsTypingOrEditing()) return;
+    window.location.reload();
+  }, REFRESH_MS);
+</script>
+
+{% endblock %}

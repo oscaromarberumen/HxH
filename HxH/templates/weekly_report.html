@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% set title = "Reporte Semanal de Eficiencia" %}
+{% set subtitle = "Totales por Técnico y por Línea • Semana ISO (Lun–Vie) + Comparación" %}
+
+{% block content %}
+
+<!-- TOP ACTIONS -->
+<div class="row" style="justify-content:space-between; align-items:flex-end; margin-bottom:10px;">
+  <div>
+    <h3 style="margin:0;">Semana {{ week }} / {{ year }}</h3>
+    <div class="muted" style="margin-top:4px;">
+      Rango (Lun–Vie): <b>{{ week_start }}</b> → <b>{{ week_end }}</b>
+      • Horario: {{ schedule_start }} → {{ schedule_end }}
+      • Meta semanal = meta diaria × {{ workdays_per_week }}
+    </div>
+  </div>
+
+  <div class="row" style="gap:8px;">
+    <a class="linkbtn" href="{{ url_for('supervisor') }}">Supervisor</a>
+    <a class="linkbtn btn2" href="{{ url_for('line_dashboard') }}">Dashboard Líneas</a>
+    <a class="linkbtn" href="{{ url_for('export_weekly_excel', year=year, week=week) }}">Exportar Excel</a>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="card" style="padding:12px; margin-bottom:12px;">
+  <form method="GET" class="row" style="gap:10px; align-items:flex-end;">
+    <div>
+      <label class="muted" style="display:block; font-size:12px;">Año</label>
+      <input type="number" name="year" value="{{ year }}" min="2020" max="2100">
+    </div>
+    <div>
+      <label class="muted" style="display:block; font-size:12px;">Semana (ISO)</label>
+      <input type="number" name="week" value="{{ week }}" min="1" max="53">
+    </div>
+    <div>
+      <button class="btn" type="submit">Ver Reporte</button>
+    </div>
+  </form>
+</div>
+
+<!-- GRID -->
+<div class="grid2">
+
+  <!-- COMPARACIÓN -->
+  <div class="card" style="padding:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <div>
+        <h3 style="margin:0;">Comparación vs Semana Anterior</h3>
+        <div class="muted" style="margin-top:4px;">
+          Anterior (Lun–Vie): <b>{{ prev_start }}</b> → <b>{{ prev_end }}</b>
+        </div>
+      </div>
+      <span class="badge">Δ semanal</span>
+    </div>
+
+    <hr class="hr">
+
+    <div class="row" style="justify-content:space-between; gap:14px;">
+      <div class="chip">
+        <div class="muted" style="font-size:12px;">Total semana actual</div>
+        <div style="font-size:22px; font-weight:900;">{{ current_total_all }}</div>
+      </div>
+
+      <div class="chip">
+        <div class="muted" style="font-size:12px;">Total semana anterior</div>
+        <div style="font-size:22px; font-weight:900;">{{ prev_total_all }}</div>
+      </div>
+
+      <div class="chip">
+        <div class="muted" style="font-size:12px;">Diferencia</div>
+        <div style="font-size:22px; font-weight:900;">
+          {% if delta_total_all >= 0 %}
+            <span style="color:#0f5132;">+{{ delta_total_all }}</span>
+          {% else %}
+            <span style="color:#842029;">{{ delta_total_all }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <hr class="hr">
+
+    <div class="tablewrap">
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Línea</th>
+            <th>Actual</th>
+            <th>Anterior</th>
+            <th>Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in compare_lines %}
+            <tr>
+              <td><b>{{ r.line }}</b></td>
+              <td>{{ r.current }}</td>
+              <td>{{ r.previous }}</td>
+              <td>
+                {% if r.delta >= 0 %}
+                  <b style="color:#0f5132;">+{{ r.delta }}</b>
+                {% else %}
+                  <b style="color:#842029;">{{ r.delta }}</b>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TOTALES POR LÍNEA -->
+  <div class="card" style="padding:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <div>
+        <h3 style="margin:0;">Totales por Línea</h3>
+        <div class="muted" style="margin-top:4px;">Semana laboral (Lun–Vie)</div>
+      </div>
+      <span class="badge">Metas</span>
+    </div>
+
+    <hr class="hr">
+
+    <div class="tablewrap">
+      <table class="table compact">
+        <thead>
+          <tr>
+            <th>Línea</th>
+            <th>Total</th>
+            <th>Meta Semana</th>
+            <th>Faltante</th>
+            <th>Eficiencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in line_rows %}
+            <tr>
+              <td><b>{{ r.line }}</b></td>
+              <td>{{ r.total }}</td>
+              <td>{{ r.weekly_goal if r.weekly_goal is not none else "-" }}</td>
+              <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+              <td>
+                {% if r.eff is not none %}
+                  {% if r.eff >= 100 %}
+                    <b style="color:#0f5132;">{{ r.eff }}%</b>
+                  {% else %}
+                    <b>{{ r.eff }}%</b>
+                  {% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- RANKING -->
+<div class="card" style="padding:14px; margin-top:12px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+    <div>
+      <h3 style="margin:0;">Ranking por Técnico</h3>
+      <div class="muted" style="margin-top:4px;">Ordenado por eficiencia (%) y total semanal (Lun–Vie).</div>
+    </div>
+    <span class="badge">Top Techs</span>
+  </div>
+
+  <hr class="hr">
+
+  <div class="tablewrap">
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Empleado</th>
+          <th>Nombre</th>
+          <th>Línea</th>
+          <th>Total</th>
+          <th>Meta Semana</th>
+          <th>Faltante</th>
+          <th>Eficiencia</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in tech_rows %}
+          <tr>
+            <td><b>{{ r.employee_no }}</b></td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.line }}</td>
+            <td><b>{{ r.total }}</b></td>
+            <td>{{ r.weekly_goal if r.weekly_goal is not none else "-" }}</td>
+            <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+            <td>
+              {% if r.eff is not none %}
+                {% if r.eff >= 100 %}
+                  <b style="color:#0f5132;">{{ r.eff }}%</b>
+                {% else %}
+                  <b>{{ r.eff }}%</b>
+                {% endif %}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="muted small" style="margin-top:10px;">
+    Nota: Este reporte considera únicamente capturas de <b>Lunes a Viernes</b> (semana laboral).
+  </div>
+</div>
+
+{% endblock %}
+

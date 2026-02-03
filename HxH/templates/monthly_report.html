@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% set title = "Reporte Mensual de Eficiencia" %}
+{% set subtitle = "Totales por Técnico y por Línea • Mes seleccionado" %}
+
+{% block content %}
+
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Mes {{ month }} / {{ year }}</h3>
+      <div class="muted small">
+        Rango: <b>{{ month_start }}</b> → <b>{{ month_end }}</b> • Horario: {{ schedule_start }} → {{ schedule_end }}
+        • Días hábiles (L-V): <b>{{ workdays }}</b>
+      </div>
+    </div>
+
+    <form method="GET" class="row row-tight">
+      <div class="field">
+        <label>Año</label>
+        <input type="number" name="year" value="{{ year }}" min="2020" max="2100">
+      </div>
+      <div class="field">
+        <label>Mes</label>
+        <input type="number" name="month" value="{{ month }}" min="1" max="12">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Ver</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h3>Ranking por Técnico (Mes)</h3>
+    <div class="tablewrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Nombre</th>
+            <th>Línea</th>
+            <th>Total</th>
+            <th>Meta Mes</th>
+            <th>Faltante</th>
+            <th>Eficiencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in tech_rows %}
+            <tr>
+              <td><b>{{ r.employee_no }}</b></td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.line }}</td>
+              <td>{{ r.total }}</td>
+              <td>{{ r.monthly_goal if r.monthly_goal is not none else "-" }}</td>
+              <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+              <td>
+                {% if r.eff is not none %}
+                  <b>{{ r.eff }}%</b>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Totales por Línea (Mes)</h3>
+    <div class="tablewrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Línea</th>
+            <th>Total</th>
+            <th>Meta Mes</th>
+            <th>Faltante</th>
+            <th>Eficiencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in line_rows %}
+            <tr>
+              <td><b>{{ r.line }}</b></td>
+              <td>{{ r.total }}</td>
+              <td>{{ r.monthly_goal if r.monthly_goal is not none else "-" }}</td>
+              <td>{{ r.remaining if r.remaining is not none else "-" }}</td>
+              <td>
+                {% if r.eff is not none %}
+                  <b>{{ r.eff }}%</b>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

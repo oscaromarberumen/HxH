@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% set title = "Panel Técnico" %}
+{% set subtitle = "Bitácora por minuto • Registra Número de Parte y Cantidad" %}
+
+{# ✅ Protección: si no mandas estas variables desde app.py, no truena #}
+{% set inv_initial = inv_initial|default(None) %}
+{% set inv_produced = inv_produced|default(0) %}
+{% set inv_final = inv_final|default(None) %}
+
+{% block content %}
+
+<!-- =========================================
+     ✅ FILTROS (Fecha + Buscar NP)
+     ========================================= -->
+<div class="card" style="margin-bottom:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Filtros</h3>
+      <div class="muted small">
+        Aquí puedes ver lo que ya capturaste en días anteriores.
+      </div>
+    </div>
+  </div>
+
+  <form method="GET" class="row" style="margin-top:12px;">
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" name="date" id="filterDate" value="{{ selected_date }}">
+    </div>
+
+    <div class="field flex1">
+      <label>Buscar Número de Parte (filtro rápido)</label>
+      <input type="text" id="searchPart"
+             placeholder="Ej: EM1230, 9L3Z..."
+             autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn" type="submit">Ver</button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn2" type="button" onclick="clearSearch()">Limpiar búsqueda</button>
+    </div>
+  </form>
+
+  <div class="row row-tight" style="margin-top:10px;">
+    <button class="btnlink" type="button" onclick="goDay(-1)">Ayer</button>
+    <button class="btnlink" type="button" onclick="goToday()">Hoy</button>
+    <button class="btnlink" type="button" onclick="goDay(1)">Mañana</button>
+
+    <span class="badge2" id="visibleCountBadge">Registros visibles: --</span>
+
+    <span class="muted small" style="margin-left:6px;">
+      Tip: puedes escribir parte del número y filtra sin recargar.
+    </span>
+  </div>
+</div>
+
+<div class="chips">
+  <div class="chip">
+    <div class="chip-label">Fecha</div>
+    <div class="chip-value">{{ selected_date }}</div>
+  </div>
+
+  <div class="chip">
+    <div class="chip-label">Técnico</div>
+    <div class="chip-value">{{ user["name"] }}</div>
+    <div class="chip-sub muted">Emp: {{ user["employee_no"] }}</div>
+  </div>
+
+  <div class="chip">
+    <div class="chip-label">Línea</div>
+    <div class="chip-value">
+      {{ user["line"] if user["line"] else "Sin asignar" }}
+    </div>
+  </div>
+
+  <div class="chip">
+    <div class="chip-label">Horario</div>
+    <div class="chip-value">{{ schedule_start }} → {{ schedule_end }}</div>
+    <div class="chip-sub muted">Gracia: {{ schedule_grace }} min</div>
+  </div>
+
+  <div class="chip">
+    <div class="chip-label">Estado</div>
+    {% if auto_locked %}
+      <div class="chip-value warntext">BLOQUEADO</div>
+      <div class="chip-sub muted">Fuera de horario</div>
+    {% else %}
+      <div class="chip-value oktext">ABIERTO</div>
+      <div class="chip-sub muted">Puedes capturar</div>
+    {% endif %}
+  </div>
+
+  <div class="chip">
+    <div class="chip-label">Hora actual</div>
+    <div class="chip-value">{{ now_time_hhmm }}</div>
+  </div>
+</div>
+
+<!-- ✅ META DEL TÉCNICO -->
+<div class="card">
+  <h3>Meta del Técnico</h3>
+
+  <div class="kpirow">
+    <div class="kpi">
+      <div class="kpi-label">Meta diaria</div>
+      <div class="kpi-value">{{ tech_goal if tech_goal is not none else "Sin meta" }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Producido</div>
+      <div class="kpi-value">{{ tech_total }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Faltante</div>
+      <div class="kpi-value">{{ tech_remaining if tech_remaining is not none else "-" }}</div>
+    </div>
+  </div>
+
+  {% if tech_goal is not none and tech_goal > 0 %}
+    {% set pct = (tech_total * 100 / tech_goal) %}
+    <div class="progress">
+      <div class="bar" style="width: {{ 100 if pct > 100 else pct }}%;"></div>
+    </div>
+    <div class="muted small" style="margin-top:6px;">
+      Avance: {{ (100 if pct > 100 else pct)|round(0) }}%
+    </div>
+  {% endif %}
+</div>
+
+<!-- =========================================
+     ✅ INVENTARIO INICIAL / FINAL
+     ========================================= -->
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Inventario del Día</h3>
+      <div class="muted small">
+        El inventario final se calcula automáticamente: <b>Inicial - Producido</b>
+      </div>
+    </div>
+
+    <div class="muted small">
+      Fecha: <b>{{ selected_date }}</b>
+    </div>
+  </div>
+
+  <div class="kpirow" style="margin-top:12px;">
+    <div class="kpi">
+      <div class="kpi-label">Inventario Inicial</div>
+      <div class="kpi-value">
+        {{ inv_initial if inv_initial is not none else "No capturado" }}
+      </div>
+      {% if inv_initial is none %}
+        <div class="kpi-sub muted small">Captúralo para ver el final</div>
+      {% endif %}
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">Producido</div>
+      <div class="kpi-value">{{ inv_produced }}</div>
+      <div class="kpi-sub muted small">Suma del día</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">Inventario Final</div>
+
+      {% if inv_final is not none %}
+        {% set inv_class = "dangertext" if inv_final < 0 else "" %}
+        <div class="kpi-value {{ inv_class }}">
+          {{ inv_final }}
+        </div>
+
+        {% if inv_final < 0 %}
+          <div class="kpi-sub muted small">Revisa: producido mayor al inicial</div>
+        {% endif %}
+
+      {% else %}
+        <div class="kpi-value">-</div>
+        <div class="kpi-sub muted small">Pendiente</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <form method="POST" class="row" style="align-items:flex-end;">
+    <input type="hidden" name="action" value="set_inventory">
+
+    <div class="field" style="min-width:240px;">
+      <label>Inventario Inicial (cantidad)</label>
+      <input name="initial_qty" type="number" min="0" step="1"
+             value="{{ inv_initial if inv_initial is not none else '' }}"
+             placeholder="Ej: 40"
+             {% if not can_edit %}disabled{% endif %}>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn" type="submit" {% if not can_edit %}disabled{% endif %}>
+        Guardar Inventario
+      </button>
+    </div>
+
+    <div class="muted small" style="margin-left:8px;">
+      {% if not can_edit %}
+        <span class="warntext">Inventario bloqueado por estar fuera de horario.</span>
+      {% else %}
+        Guarda una sola vez o actualízalo si cambia.
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="grid2" style="margin-top:14px;">
+  <div class="card card-compact">
+    <div class="cardhead">
+      <h3 style="margin:0;">Registrar Producción</h3>
+      <div class="muted small">Cada captura genera un registro con hora exacta.</div>
+    </div>
+
+    <form method="POST" class="row" style="margin-top:10px;">
+      <input type="hidden" name="action" value="add_entry">
+
+      <div class="field">
+        <label>Hora (HH:MM)</label>
+        <input type="time" name="time_hhmm" value="{{ now_time_hhmm }}" required {% if not can_edit %}disabled{% endif %}>
+      </div>
+
+      <div class="field flex1">
+        <label>Número de Parte</label>
+        <input name="part_no" placeholder="Ej: EM1230" required {% if not can_edit %}disabled{% endif %}>
+      </div>
+
+      <!-- ✅ TIPO GOOD / FIX / SCRAP -->
+      <div class="field">
+        <label>Tipo</label>
+        <select name="log_type" {% if not can_edit %}disabled{% endif %}>
+          <option value="GOOD">GOOD</option>
+          <option value="FIX">FIX</option>
+          <option value="SCRAP">SCRAP</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Cantidad</label>
+        <input name="qty" type="number" min="1" placeholder="1" required class="qty" {% if not can_edit %}disabled{% endif %}>
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit" {% if not can_edit %}disabled{% endif %}>Guardar</button>
+      </div>
+    </form>
+
+    <div class="muted small" style="margin-top:10px;">
+      Permitido: <b>{{ schedule_start }}</b> a <b>{{ schedule_end }}</b>.
+      {% if not can_edit %}
+        <span class="warntext">Captura bloqueada.</span>
+      {% endif %}
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="margin:0;">Bitácora del Día</h3>
+        <div class="muted small">
+          Registros totales del día: <b id="totalDayCount">{{ entries|length }}</b>
+          • Visibles (filtro): <b id="visibleDayCount">{{ entries|length }}</b>
+        </div>
+      </div>
+      {# ✅ Se eliminó el botón/form de "Cerrar Día" #}
+    </div>
+
+    <div class="tablewrap">
+      <table class="table" id="entriesTable">
+        <thead>
+          <tr>
+            <th style="width:110px;">Hora</th>
+            <th>Número de Parte</th>
+            <th style="width:110px;">Tipo</th>
+            <th style="width:120px;">Cantidad</th>
+            <th style="width:260px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if entries|length == 0 %}
+            <tr>
+              <td colspan="5" class="muted">Sin registros todavía.</td>
+            </tr>
+          {% endif %}
+
+          {% for e in entries %}
+            <tr class="entry-row"
+                data-part="{{ (e['part_no'] or '')|upper }}">
+              <td><b>{{ e["log_time"] }}</b></td>
+
+              <td class="part-cell">
+                {% if can_edit %}
+                  <form method="POST" class="row row-tight" style="gap:8px;">
+                    <input type="hidden" name="action" value="edit_entry">
+                    <input type="hidden" name="entry_id" value="{{ e['id'] }}">
+
+                    <input type="time" name="time_hhmm" value="{{ e['log_time'] }}" class="mini" required>
+                    <input name="part_no" value="{{ e['part_no'] }}" class="mini flex1" required>
+
+                    <select name="log_type" class="mini">
+                      <option value="GOOD" {% if (e["log_type"]|upper) == "GOOD" %}selected{% endif %}>GOOD</option>
+                      <option value="FIX" {% if (e["log_type"]|upper) == "FIX" %}selected{% endif %}>FIX</option>
+                      <option value="SCRAP" {% if (e["log_type"]|upper) == "SCRAP" %}selected{% endif %}>SCRAP</option>
+                    </select>
+
+                    <input name="qty" type="number" min="1" value="{{ e['qty'] }}" class="mini qty" required>
+                    <button class="btn2" type="submit">Actualizar</button>
+                  </form>
+                {% else %}
+                  {{ e["part_no"] }}
+                {% endif %}
+              </td>
+
+              <td>
+                {% if not can_edit %}
+                  <b>{{ (e["log_type"] or "GOOD")|upper }}</b>
+                {% else %}
+                  <span class="muted small">—</span>
+                {% endif %}
+              </td>
+
+              <td>
+                {% if not can_edit %}
+                  {{ e["qty"] }}
+                {% endif %}
+              </td>
+
+              <td>
+                {% if can_edit %}
+                  <form method="POST" style="display:inline-block;">
+                    <input type="hidden" name="action" value="delete_entry">
+                    <input type="hidden" name="entry_id" value="{{ e['id'] }}">
+                    <button class="btn2 danger" type="submit"
+                      onclick="return confirm('¿Eliminar este registro?');">
+                      Eliminar
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="muted small">Edición no disponible</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Resumen por Hora</h3>
+    <p class="muted small">Suma de cantidades agrupadas por hora ({{ schedule_start }} a {{ schedule_end }}).</p>
+
+    <div class="tablewrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:120px;">Hora</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h, total in hour_summary.items() %}
+            <tr class="{% if h == now_hour %}row-now{% endif %}">
+              <td><b>{{ "%02d:00"|format(h) }}</b></td>
+              <td>{{ total }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="muted small" style="margin-top:10px;">
+      Tip: si capturas varias veces en la misma hora, aquí se suman automáticamente.
+    </div>
+  </div>
+</div>
+
+<!-- =========================================
+     ✅ JS: Ayer/Hoy/Mañana + Buscar NP
+     ========================================= -->
+<script>
+  function formatDate(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function setDateAndGo(dateStr){
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", dateStr);
+    window.location.href = url.toString();
+  }
+
+  function goToday(){
+    setDateAndGo(formatDate(new Date()));
+  }
+
+  function goDay(offset){
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    setDateAndGo(formatDate(d));
+  }
+
+  function clearSearch(){
+    const box = document.getElementById("searchPart");
+    if(box){
+      box.value = "";
+      applySearchFilter();
+      box.focus();
+    }
+  }
+
+  function applySearchFilter(){
+    const box = document.getElementById("searchPart");
+    const q = (box?.value || "").trim().toUpperCase();
+
+    const rows = document.querySelectorAll("#entriesTable tbody tr.entry-row");
+    let visible = 0;
+
+    rows.forEach(tr => {
+      const part = (tr.getAttribute("data-part") || "").toUpperCase();
+      const show = (!q) || part.includes(q);
+      tr.style.display = show ? "" : "none";
+      if(show) visible++;
+    });
+
+    const badge = document.getElementById("visibleCountBadge");
+    const vday = document.getElementById("visibleDayCount");
+    if(badge) badge.textContent = `Registros visibles: ${visible}`;
+    if(vday) vday.textContent = String(visible);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const box = document.getElementById("searchPart");
+    if(box){
+      box.addEventListener("input", applySearchFilter);
+    }
+    applySearchFilter();
+  });
+</script>
+
+{% endblock %}
