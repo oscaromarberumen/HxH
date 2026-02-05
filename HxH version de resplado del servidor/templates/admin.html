@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% set title = "Panel Admin" %}
+{% set subtitle = "Usuarios • Horario • Administración general" %}
+
+{% block content %}
+
+<div class="grid2">
+
+  <!-- =============================
+       HORARIO
+       ============================= -->
+  <div class="card">
+    <h3 style="margin:0;">Horario de captura</h3>
+    <div class="muted small" style="margin-top:6px;">
+      Configura el rango permitido para registrar producción.
+    </div>
+
+    <div class="hr"></div>
+
+    <form method="POST" class="row">
+      <input type="hidden" name="action" value="update_schedule">
+
+      <div class="field">
+        <label>Inicio</label>
+        <input type="time" name="start_time" value="{{ schedule_start }}" required>
+      </div>
+
+      <div class="field">
+        <label>Final</label>
+        <input type="time" name="end_time" value="{{ schedule_end }}" required>
+      </div>
+
+      <div class="field">
+        <label>Gracia (min)</label>
+        <input type="number" name="grace_minutes" min="0" max="300" value="{{ schedule_grace }}" required>
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+
+  <!-- =============================
+       CREAR USUARIO
+       ============================= -->
+  <div class="card">
+    <h3 style="margin:0;">Crear usuario</h3>
+    <div class="muted small" style="margin-top:6px;">
+      Agrega técnicos, supervisores o administradores.
+    </div>
+
+    <div class="hr"></div>
+
+    <form method="POST" class="row" id="createUserForm">
+      <input type="hidden" name="action" value="create_user">
+
+      <div class="field">
+        <label>No. Empleado</label>
+        <input name="employee_no" placeholder="Ej: 12345" required>
+      </div>
+
+      <div class="field flex1">
+        <label>Nombre</label>
+        <input name="name" placeholder="Nombre completo" required>
+      </div>
+
+      <div class="field">
+        <label>Rol</label>
+        <select name="role" required>
+          <option value="technician">Technician</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>PIN</label>
+        <input type="password" name="pin" placeholder="****" required>
+      </div>
+
+      <div class="field">
+        <label>Línea</label>
+        <select name="line" id="createLineSelect" required>
+          {% for l in lines %}
+            <option value="{{ l }}">{{ l }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field" id="createLineOtherWrap" style="display:none;">
+        <label>Nombre de línea</label>
+        <input name="line_other" id="createLineOtherInput" placeholder="Ej: HONDA">
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Crear</button>
+      </div>
+    </form>
+
+    <div class="muted small" style="margin-top:8px;">
+      Tip: Si eliges <b>OTRA</b>, escribe el nombre real de la línea.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- =============================
+     LISTA DE USUARIOS
+     ============================= -->
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Usuarios</h3>
+      <div class="muted small">
+        Gestiona usuarios activos/inactivos, PIN, línea y eliminación.
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap">
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>No. Emp</th>
+          <th>Nombre</th>
+          <th>Rol</th>
+          <th>Línea</th>
+          <th>Activo</th>
+          <th>Creado</th>
+          <th style="width:420px;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users_list %}
+          <tr>
+            <td><b>{{ u.employee_no }}</b></td>
+            <td>{{ u.name }}</td>
+            <td>{{ u.role }}</td>
+            <td>{{ u.line }}</td>
+            <td>
+              {% if u.is_active == 1 %}
+                <span class="oktext">SI</span>
+              {% else %}
+                <span class="dangertext">NO</span>
+              {% endif %}
+            </td>
+            <td class="muted small">{{ u.created_at }}</td>
+
+            <td>
+              <div class="row row-tight" style="flex-wrap:wrap; gap:8px;">
+
+                <!-- Activar / Desactivar -->
+                <form method="POST" style="display:inline;">
+                  <input type="hidden" name="action" value="toggle_active">
+                  <input type="hidden" name="employee_no" value="{{ u.employee_no }}">
+                  <button class="btn2" type="submit"
+                          {% if u.employee_no == '0000' %}disabled{% endif %}>
+                    {% if u.is_active == 1 %}Desactivar{% else %}Activar{% endif %}
+                  </button>
+                </form>
+
+                <!-- Reset PIN -->
+                <form method="POST" class="row row-tight" style="display:inline;">
+                  <input type="hidden" name="action" value="reset_pin">
+                  <input type="hidden" name="employee_no" value="{{ u.employee_no }}">
+                  <input class="mini" type="password" name="new_pin" placeholder="Nuevo PIN" required>
+                  <button class="btn" type="submit">PIN</button>
+                </form>
+
+                <!-- Cambiar Línea -->
+                <form method="POST" class="row row-tight updateLineForm" style="display:inline;">
+                  <input type="hidden" name="action" value="update_line">
+                  <input type="hidden" name="employee_no" value="{{ u.employee_no }}">
+
+                  <select class="mini newLineSelect" name="new_line">
+                    {% for l in lines %}
+                      <option value="{{ l }}" {% if u.line == l %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <input class="mini newLineOtherInput" name="new_line_other" placeholder="Si OTRA..." style="display:none;">
+                  <button class="btn" type="submit">Línea</button>
+                </form>
+
+                <!-- ✅ ELIMINAR (SEGURO) -->
+                <form method="POST" style="display:inline;"
+                      onsubmit="return confirm('¿Seguro que deseas eliminar al usuario {{ u.employee_no }}?');">
+                  <input type="hidden" name="action" value="delete_user">
+                  <input type="hidden" name="employee_no" value="{{ u.employee_no }}">
+                  <button class="btn danger" type="submit"
+                          {% if u.employee_no in ['0000','9999'] %}disabled{% endif %}>
+                    Eliminar
+                  </button>
+                </form>
+
+                <!-- ✅ ELIMINAR TODO (FULL DELETE + HISTORIAL) -->
+                <form method="POST" style="display:inline;"
+                      onsubmit="return confirm('⚠️ Esto eliminará el usuario {{ u.employee_no }} y TODO su historial. ¿Seguro?');">
+                  <input type="hidden" name="action" value="delete_user_full">
+                  <input type="hidden" name="employee_no" value="{{ u.employee_no }}">
+                  <button class="btn danger" type="submit"
+                          {% if u.employee_no in ['0000','9999'] or u.role != 'technician' %}disabled{% endif %}>
+                    Eliminar TODO
+                  </button>
+                </form>
+
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="muted small" style="margin-top:10px;">
+    Nota: <b>Eliminar</b> intentará borrar al usuario solo si no tiene historial. Si tiene logs/cierres/metas se desactiva automáticamente.
+  </div>
+</div>
+
+<!-- =============================
+     JS: OTRA -> mostrar input
+     ============================= -->
+<script>
+  function toggleOtherLine(selectEl, otherWrapEl, otherInputEl){
+    const val = (selectEl.value || "").toUpperCase();
+    const isOther = (val === "OTRA");
+
+    otherWrapEl.style.display = isOther ? "" : "none";
+    if (otherInputEl) {
+      otherInputEl.required = isOther;
+      if (!isOther) otherInputEl.value = "";
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // Crear usuario: línea OTRA
+    const createSel = document.getElementById("createLineSelect");
+    const createWrap = document.getElementById("createLineOtherWrap");
+    const createInp = document.getElementById("createLineOtherInput");
+
+    if (createSel && createWrap && createInp) {
+      createSel.addEventListener("change", () => toggleOtherLine(createSel, createWrap, createInp));
+      toggleOtherLine(createSel, createWrap, createInp);
+    }
+
+    // Cambiar línea en tabla: OTRA por usuario
+    const forms = document.querySelectorAll(".updateLineForm");
+    forms.forEach(f => {
+      const sel = f.querySelector(".newLineSelect");
+      const inp = f.querySelector(".newLineOtherInput");
+      if (!sel || !inp) return;
+
+      const wrap = inp; // en este caso el input es el "wrap" visual
+      sel.addEventListener("change", () => {
+        const val = (sel.value || "").toUpperCase();
+        const isOther = (val === "OTRA");
+        wrap.style.display = isOther ? "" : "none";
+        inp.required = isOther;
+        if (!isOther) inp.value = "";
+      });
+
+      // inicial
+      const initVal = (sel.value || "").toUpperCase();
+      const initOther = (initVal === "OTRA");
+      wrap.style.display = initOther ? "" : "none";
+      inp.required = initOther;
+    });
+  });
+</script>
+
+{% endblock %}
+

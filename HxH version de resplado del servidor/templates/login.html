@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% set title = "Inicio de Sesión" %}
+{% set subtitle = "Acceso por No. Empleado + PIN" %}
+
+{% block content %}
+
+<div class="grid2">
+  <div class="card">
+    <h3>Acceder</h3>
+    <p class="muted">Ingresa tu número de empleado y PIN.</p>
+
+    <form method="POST" class="formcol">
+      <div class="field">
+        <label>No. Empleado</label>
+        <input name="employee_no" placeholder="Ej: 12345" required autofocus>
+      </div>
+
+      <div class="field">
+        <label>PIN</label>
+        <input name="pin" placeholder="****" required>
+      </div>
+
+      <button class="btn" type="submit">Entrar</button>
+
+      <div class="muted small" style="margin-top:10px;">
+        Usuarios default:
+        <br>Tecnico: <b>**** / ****</b>
+	 <br>Admin: <b>**** / ****</b>
+        <br>Supervisor: <b>**** / ****</b>
+      </div>
+    </form>
+  </div>
+
+  <div class="card soft">
+    <h3>¿Qué hace esta app?</h3>
+    <ul class="muted">
+      <li>Hasta 20 técnicos registrando producción en tiempo real.</li>
+      <li>Bitácora por minuto: (varios registros por hora).</li>
+      <li>Supervisor: analisis de metas por técnico y por línea.</li>
+      <li>Admin: configura horarios y usuarios.</li>
+    </ul>
+    <div class="hr"></div>
+    <div class="muted small">
+      <br><b></b>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

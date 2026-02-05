@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% set title = "Borrar Capturas" %}
+{% set subtitle = "Admin • Elimina capturas aunque el día esté cerrado" %}
+
+{% block content %}
+
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Filtros</h3>
+      <div class="muted small">
+        Selecciona fecha y filtra por técnico/línea para encontrar capturas erróneas.
+      </div>
+    </div>
+  </div>
+
+  <form method="GET" class="row" style="margin-top:12px;">
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" name="date" value="{{ selected_date }}">
+    </div>
+
+    <div class="field">
+      <label>Técnico</label>
+      <select name="emp">
+        <option value="">Todos</option>
+        {% for u in users_list %}
+          {% if u["role"] == "technician" %}
+            <option value="{{ u['employee_no'] }}" {% if selected_emp == u['employee_no'] %}selected{% endif %}>
+              {{ u["employee_no"] }} - {{ u["name"] }}
+            </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Línea</label>
+      <select name="line">
+        <option value="">Todas</option>
+        {% for l in lines %}
+          <option value="{{ l }}" {% if selected_line == l %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn" type="submit">Buscar</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Capturas del día</h3>
+      <div class="muted small">
+        Fecha: <b>{{ selected_date }}</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap">
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Hora</th>
+          <th>Empleado</th>
+          <th>Nombre</th>
+          <th>Línea</th>
+          <th>Número de Parte</th>
+          <th>Cantidad</th>
+          <th>Actualización</th>
+          <th>Eliminar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if logs|length == 0 %}
+          <tr><td colspan="9" class="muted">Sin registros con esos filtros.</td></tr>
+        {% endif %}
+
+        {% for r in logs %}
+          <tr>
+            <td><b>{{ r["id"] }}</b></td>
+            <td>{{ r["log_time"] }}</td>
+            <td>{{ r["employee_no"] }}</td>
+            <td>{{ r["name"] }}</td>
+            <td>{{ r["line"] }}</td>
+            <td>{{ r["part_no"] }}</td>
+            <td><b>{{ r["qty"] }}</b></td>
+            <td class="muted small">{{ r["updated_at"] }}</td>
+
+            <td>
+              <form method="POST"
+                    onsubmit="return confirm('¿Seguro que deseas eliminar esta captura ID {{ r['id'] }}?');">
+                <input type="hidden" name="action" value="delete_log">
+                <input type="hidden" name="entry_id" value="{{ r['id'] }}">
+                <button class="btn danger" type="submit">Eliminar</button>
+              </form>
+            </td>
+
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

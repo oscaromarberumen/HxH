@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set title = "Dashboard por Líneas" %}
+{% set subtitle = "Vista rápida por línea + técnicos dentro de cada línea" %}
+
+{% block content %}
+
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <h3 style="margin:0;">Resumen</h3>
+      <div class="muted small">Horario: {{ schedule_start }} → {{ schedule_end }}</div>
+    </div>
+
+    <form method="GET" class="row row-tight">
+      <div class="field">
+        <label>Fecha</label>
+        <input type="date" name="date" value="{{ selected_date }}">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" type="submit">Ver</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="grid3">
+  {% for c in line_cards %}
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">{{ c.line }}</h3>
+        <span class="badge2"><b>{{ c.total }}</b> pcs</span>
+      </div>
+
+      <div class="muted small" style="margin-top:6px;">
+        Meta: <b>{{ c.goal if c.goal is not none else "Sin meta" }}</b>
+        {% if c.remaining is not none %}
+          • Faltante: <b>{{ c.remaining }}</b>
+        {% endif %}
+      </div>
+
+      {% if c.pct is not none %}
+        <div class="progress" style="margin-top:10px;">
+          <div class="bar" style="width: {{ c.pct }}%;"></div>
+        </div>
+        <div class="muted small" style="margin-top:6px;">Avance: <b>{{ c.pct }}%</b></div>
+      {% endif %}
+
+      <div class="hr"></div>
+
+      <div class="muted small"><b>Técnicos</b></div>
+      <div class="tablewrap" style="max-height:220px;">
+        <!-- ✅ compact -->
+        <table class="table compact">
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Nombre</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set tlist = tech_map.get(c.line, []) %}
+            {% if tlist|length == 0 %}
+              <tr><td colspan="3" class="muted">Sin técnicos.</td></tr>
+            {% endif %}
+            {% for t in tlist %}
+              <tr>
+                <td><b>{{ t.employee_no }}</b></td>
+                <td>{{ t.name }}</td>
+                <td><b>{{ t.total }}</b></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
