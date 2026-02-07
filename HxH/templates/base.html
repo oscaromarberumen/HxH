@@ -58,9 +58,69 @@
         radial-gradient(700px 450px at 55% 110%, rgba(255,204,102,.10), transparent 60%),
         linear-gradient(180deg, var(--bg1), var(--bg2));
       overflow-x:hidden;
+      transition: background .25s ease, color .25s ease;
     }
 
     a{ color:inherit; text-decoration:none; }
+
+    body[data-theme="light"]{
+      --bg1: #f6f7fb;
+      --bg2: #e9eef6;
+      --card: rgba(255,255,255,.86);
+      --card2: rgba(255,255,255,.96);
+      --border: rgba(17,24,39,.10);
+      --text: #0f172a;
+      --muted: rgba(15,23,42,.65);
+      --primary:#2563eb;
+      --primary2:#1d4ed8;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+      --danger:#dc2626;
+      --shadow: 0 16px 30px rgba(2,8,23,.12);
+    }
+
+    body[data-theme="graphite"]{
+      --bg1:#0f1115;
+      --bg2:#1a1f2b;
+      --card: rgba(255,255,255,.05);
+      --card2: rgba(255,255,255,.08);
+      --border: rgba(255,255,255,.12);
+      --text:#e5e7eb;
+      --muted: rgba(229,231,235,.62);
+      --primary:#a78bfa;
+      --primary2:#8b5cf6;
+      --ok:#34d399;
+      --warn:#fbbf24;
+      --danger:#f87171;
+    }
+
+    body[data-theme="forest"]{
+      --bg1:#0c1b16;
+      --bg2:#10251c;
+      --card: rgba(255,255,255,.06);
+      --card2: rgba(255,255,255,.09);
+      --border: rgba(255,255,255,.12);
+      --text:#e7f6ef;
+      --muted: rgba(231,246,239,.64);
+      --primary:#34d399;
+      --primary2:#10b981;
+      --ok:#22c55e;
+      --warn:#fbbf24;
+      --danger:#fb7185;
+    }
+
+    body.has-custom-bg{
+      background-image:
+        var(--custom-bg),
+        radial-gradient(900px 500px at 18% -10%, rgba(110,168,255,.20), transparent 60%),
+        radial-gradient(900px 500px at 85% 0%, rgba(61,220,151,.13), transparent 55%),
+        radial-gradient(700px 450px at 55% 110%, rgba(255,204,102,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      background-size: cover, auto, auto, auto, auto;
+      background-position: center, center, center, center, center;
+      background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+      background-attachment: fixed, fixed, fixed, fixed, fixed;
+    }
 
     /* ============================================================
        ✅ DECOR ORBS
@@ -170,6 +230,29 @@
       align-items:center;
       justify-content:flex-end;
       min-width: 220px;
+    }
+
+    .themebox{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .themebox select,
+    .themebox input[type="url"],
+    .themebox input[type="file"]{
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .themebox .btn2{
+      padding: 7px 10px;
+    }
+    .themebox small{
+      color: var(--muted);
     }
     .pill{
       display:flex;
@@ -659,6 +742,19 @@
       </div>
 
       <div class="userbox">
+        <div class="themebox" aria-label="Personalización de tema">
+          <select id="themeSelect" aria-label="Seleccionar tema">
+            <option value="default">Tema: Default</option>
+            <option value="light">Tema: Claro</option>
+            <option value="graphite">Tema: Graphite</option>
+            <option value="forest">Tema: Forest</option>
+          </select>
+
+          <input id="bgUrlInput" type="url" placeholder="URL de fondo (opcional)" aria-label="URL de imagen de fondo">
+          <input id="bgFileInput" type="file" accept="image/*" aria-label="Subir imagen de fondo">
+          <button class="btn2" type="button" id="clearBgBtn">Quitar fondo</button>
+        </div>
+
         {% if user %}
           <div class="pill">
             <span class="dot"></span>
@@ -711,6 +807,95 @@
       © {{ now().year }} • Sistema de Producción • Tema Moderno
     </div>
   </div>
+
+  <script>
+    const THEME_KEY = "prod-theme";
+    const BG_KEY = "prod-bg";
+
+    function applyTheme(theme) {
+      const body = document.body;
+      if (!theme || theme === "default") {
+        body.removeAttribute("data-theme");
+        return;
+      }
+      body.setAttribute("data-theme", theme);
+    }
+
+    function applyBackground(url) {
+      const body = document.body;
+      if (!url) {
+        body.classList.remove("has-custom-bg");
+        body.style.removeProperty("--custom-bg");
+        return;
+      }
+      body.classList.add("has-custom-bg");
+      body.style.setProperty("--custom-bg", `url('${url}')`);
+    }
+
+    function setBackgroundFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        localStorage.setItem(BG_KEY, dataUrl);
+        applyBackground(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const themeSelect = document.getElementById("themeSelect");
+      const bgUrlInput = document.getElementById("bgUrlInput");
+      const bgFileInput = document.getElementById("bgFileInput");
+      const clearBgBtn = document.getElementById("clearBgBtn");
+
+      const storedTheme = localStorage.getItem(THEME_KEY) || "default";
+      const storedBg = localStorage.getItem(BG_KEY) || "";
+
+      applyTheme(storedTheme);
+      applyBackground(storedBg);
+
+      if (themeSelect) {
+        themeSelect.value = storedTheme;
+        themeSelect.addEventListener("change", () => {
+          const value = themeSelect.value;
+          localStorage.setItem(THEME_KEY, value);
+          applyTheme(value);
+        });
+      }
+
+      if (bgUrlInput) {
+        bgUrlInput.value = storedBg && !storedBg.startsWith("data:") ? storedBg : "";
+        bgUrlInput.addEventListener("change", () => {
+          const url = bgUrlInput.value.trim();
+          if (!url) {
+            localStorage.removeItem(BG_KEY);
+            applyBackground("");
+            return;
+          }
+          localStorage.setItem(BG_KEY, url);
+          applyBackground(url);
+        });
+      }
+
+      if (bgFileInput) {
+        bgFileInput.addEventListener("change", () => {
+          const file = bgFileInput.files && bgFileInput.files[0];
+          if (file) {
+            setBackgroundFromFile(file);
+          }
+        });
+      }
+
+      if (clearBgBtn) {
+        clearBgBtn.addEventListener("click", () => {
+          localStorage.removeItem(BG_KEY);
+          if (bgUrlInput) bgUrlInput.value = "";
+          if (bgFileInput) bgFileInput.value = "";
+          applyBackground("");
+        });
+      }
+    });
+  </script>
 
 </body>
 </html>
